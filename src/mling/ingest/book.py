@@ -5,6 +5,7 @@ from pathlib import Path
 from sqlalchemy import Engine, create_engine
 
 from mling.config import Settings
+from mling.indexing.vector_store import EmbeddingStore
 from mling.ingest.errors import IngestionError
 from mling.ingest.lease import BookLeaseStore
 from mling.ingest.models import IngestionSummary
@@ -13,7 +14,6 @@ from mling.ingest.pipeline import BookPipeline, PipelineHooks
 from mling.ingest.source import SourceFile
 from mling.ingest.steps import default_steps
 from mling.ingest.writer import BookWriter
-from mling.vector_store import EmbeddingStore
 
 
 def ingest_book(

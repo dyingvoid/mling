@@ -6,6 +6,17 @@ TEI model from `docker-compose.yml` (`BAAI/bge-small-en-v1.5`, 384 dimensions).
 The storage layer uses `PGVectorStore` from `langchain-postgres` v2. It is the
 replacement for the deprecated `PGVector` class.
 
+## Layout
+
+`src/mling` is grouped by responsibility:
+
+- `domain/` — the `Book` and `Page` models.
+- `bookparse/` — PDF extraction into the domain models.
+- `indexing/` — chunking, the embedding client, storage schema constants, and
+  the pgvector store.
+- `ingest/` — the parse → chunk → embed → commit pipeline and its CLI.
+- `config.py` — environment-backed settings shared by the layers.
+
 ## Setup
 
 ```bash
@@ -183,6 +194,22 @@ It prints a summary and then prompts for page numbers until you quit with `q`.
 `mling.ingest` connects the parser, chunker, embeddings, and vector store. Files
 are identified by `sha256` of their bytes, so the same PDF under a different
 name is treated as the same book.
+
+Ingest from the command line:
+
+```bash
+uv run mling-ingest books/the-great-gatsby.pdf
+uv run mling-ingest books/ --force
+uv run mling-ingest books/the-great-gatsby.pdf --dry-run
+
+make ingest book=books/the-great-gatsby.pdf
+make ingest book=books/the-great-gatsby.pdf args=--dry-run
+```
+
+Directories are walked recursively for supported files. `--dry-run` parses and
+chunks without embedding or writing to the database, which is useful for
+checking extraction. `--quiet` suppresses per-step progress. Extra flags are
+forwarded through `make` with `args=...`.
 
 ```python
 from mling.ingest import IngestOptions, ingest_book

@@ -11,8 +11,8 @@ from langchain_postgres import PGEngine, PGVectorStore
 from langchain_postgres.v2.indexes import DistanceStrategy
 
 from mling.config import Settings
-from mling.embeddings import build_embeddings
-from mling.schema import DOCUMENT_METADATA_COLUMNS
+from mling.indexing.embeddings import build_embeddings
+from mling.indexing.schema import DOCUMENT_METADATA_COLUMNS
 
 DEFAULT_METADATA_COLUMNS = DOCUMENT_METADATA_COLUMNS
 

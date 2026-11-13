@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from mling.bookparse import Options as ParseOptions
-from mling.chunking import DEFAULT_CHUNK_OVERLAP, DEFAULT_CHUNK_SIZE
+from mling.indexing.chunking import DEFAULT_CHUNK_OVERLAP, DEFAULT_CHUNK_SIZE
 
 DEFAULT_EMBED_BATCH_SIZE = 64
 

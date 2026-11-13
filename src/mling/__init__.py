@@ -1,13 +1,14 @@
-from mling.chunking import (
+from mling.config import Settings
+from mling.indexing import (
     DEFAULT_CHUNK_OVERLAP,
     DEFAULT_CHUNK_SIZE,
+    EmbeddingStore,
+    LocalEmbeddings,
+    build_embeddings,
     build_text_splitter,
     split_documents,
     split_text,
 )
-from mling.config import Settings
-from mling.embeddings import LocalEmbeddings, build_embeddings
-from mling.vector_store import EmbeddingStore
 
 __all__ = [
     "DEFAULT_CHUNK_OVERLAP",

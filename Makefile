@@ -3,13 +3,20 @@ export
 
 export PROJECT_ROOT=$(shell pwd)
 
-.PHONY: up down cleanup migrate-up migrate-down migrate-action migrate-create run parse
+.PHONY: up down cleanup migrate-up migrate-down migrate-action migrate-create run parse ingest
 
 run:
 	@uv run python ${PROJECT_ROOT}/src/mling/__init__.py
 
 parse:
 	@uv run mling-bookparse-test $(book)
+
+ingest:
+	@if [ -z "$(book)" ]; then \
+		echo "book is not specified. Example: make ingest book=books/the-great-gatsby.pdf"; \
+		exit 1; \
+	fi
+	@uv run mling-ingest $(book) $(args)
 
 up:
 	@docker compose up -d

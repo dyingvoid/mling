@@ -5,7 +5,8 @@ THIS IS A TEST/DEBUG CLI ONLY.
 It exists so the parser can be poked at by hand while the real pipeline (the
 embedding and storage layers) is being built. It is not part of the application
 surface, nothing else imports it, and it may be deleted once the production
-entrypoint exists. Do not build features on top of it.
+entrypoint exists. Do not build features on top of it. Use `mling-ingest`
+(`mling.ingest.cli`) for real ingestion.
 """
 
 from __future__ import annotations

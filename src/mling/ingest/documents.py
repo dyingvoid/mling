@@ -4,10 +4,10 @@ import hashlib
 
 from langchain_core.documents import Document
 
-from mling.chunking import build_text_splitter
 from mling.domain import Book
+from mling.indexing.chunking import build_text_splitter
+from mling.indexing.schema import DOCUMENT_METADATA_COLUMNS
 from mling.ingest.options import IngestOptions
-from mling.schema import DOCUMENT_METADATA_COLUMNS
 
 PROMOTED_METADATA = DOCUMENT_METADATA_COLUMNS
 
