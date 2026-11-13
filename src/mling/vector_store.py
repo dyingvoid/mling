@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Sequence
 from typing import Any
 
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.vectorstores import VectorStoreRetriever
-from langchain_postgres import PGVector
-from langchain_postgres.vectorstores import DistanceStrategy
+from langchain_postgres import PGEngine, PGVectorStore
+from langchain_postgres.v2.indexes import DistanceStrategy
 
 from mling.config import Settings
 from mling.embeddings import build_embeddings
@@ -17,27 +18,26 @@ class EmbeddingStore:
     def __init__(
         self,
         embeddings: Embeddings,
-        connection: str,
-        collection_name: str,
-        embedding_length: int,
+        engine: PGEngine,
+        table_name: str,
+        distance_strategy: DistanceStrategy = DistanceStrategy.COSINE_DISTANCE,
     ) -> None:
         self._embeddings = embeddings
-        self._store = PGVector(
-            embeddings=embeddings,
-            connection=connection,
-            collection_name=collection_name,
-            embedding_length=embedding_length,
-            distance_strategy=DistanceStrategy.COSINE,
-            use_jsonb=True,
+        self._engine = engine
+        self._table_name = table_name
+        self._store = PGVectorStore.create_sync(
+            engine=engine,
+            embedding_service=embeddings,
+            table_name=table_name,
+            distance_strategy=distance_strategy,
         )
 
     @classmethod
     def from_settings(cls, settings: Settings) -> EmbeddingStore:
         return cls(
             embeddings=build_embeddings(settings),
-            connection=settings.postgres_dsn,
-            collection_name=settings.collection_name,
-            embedding_length=settings.embedding_dimension,
+            engine=PGEngine.from_connection_string(url=settings.postgres_dsn),
+            table_name=settings.table_name,
         )
 
     @property
@@ -45,12 +45,16 @@ class EmbeddingStore:
         return self._embeddings
 
     @property
-    def vector_store(self) -> PGVector:
+    def engine(self) -> PGEngine:
+        return self._engine
+
+    @property
+    def vector_store(self) -> PGVectorStore:
         return self._store
 
     @property
-    def collection_name(self) -> str:
-        return self._store.collection_name
+    def table_name(self) -> str:
+        return self._table_name
 
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
         return self._embeddings.embed_documents(list(texts))
@@ -99,8 +103,14 @@ class EmbeddingStore:
     def as_retriever(self, **kwargs: Any) -> VectorStoreRetriever:
         return self._store.as_retriever(**kwargs)
 
+    def get_by_ids(self, ids: Sequence[str]) -> list[Document]:
+        return self._store.get_by_ids(list(ids))
+
     def delete(self, ids: Sequence[str]) -> None:
         self._store.delete(ids=list(ids))
 
-    def delete_collection(self) -> None:
-        self._store.delete_collection()
+    def drop_table(self) -> None:
+        self._engine.drop_table(self._table_name)
+
+    def close(self) -> None:
+        asyncio.run(self._engine.close())

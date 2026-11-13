@@ -1,7 +1,7 @@
 [project]
 name = "mling"
 version = "0.1.0"
-description = "Add your description here"
+description = "Embeddings and pgvector storage built on LangChain"
 readme = "README.md"
 authors = [
     { name = "dyingvoid", email = "51858146+dyingvoid@users.noreply.github.com" }

@@ -18,7 +18,7 @@ class Settings:
     embedding_batch_size: int
     embedding_timeout: float
     embedding_query_instruction: str
-    collection_name: str
+    table_name: str
     postgres_dsn: str
 
     @classmethod
@@ -38,7 +38,7 @@ class Settings:
                 "EMBEDDING_QUERY_INSTRUCTION",
                 "Represent this sentence for searching relevant passages: ",
             ),
-            collection_name=_env("PGVECTOR_COLLECTION", "mling_documents"),
+            table_name=_env("PGVECTOR_TABLE", "mling_documents"),
             postgres_dsn=_env("DATABASE_URL", _postgres_dsn()),
         )
 
