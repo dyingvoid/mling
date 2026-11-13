@@ -109,6 +109,39 @@ query_vector = embeddings.embed_query("a question")
 
 Queries are prefixed with `EMBEDDING_QUERY_INSTRUCTION`; documents are not.
 
+## Book parsing
+
+PDFs are parsed into the domain model in `src/mling/domain` (`Book`, `Page`).
+The parser lives in `src/mling/bookparse` and depends on the domain layer, not
+the other way around.
+
+```python
+from mling.bookparse import parse_book
+
+book = parse_book("books/the-great-gatsby.pdf")
+print(book.title, len(book), book.metadata)
+print(book.page_text(1))
+```
+
+`parse_books("books/")` returns a `BatchResult` with parsed books, per-file
+errors, and skipped unsupported files.
+
+PDF text extraction uses `pypdf`; no OCR is performed, so scanned pages come
+back empty. Whitespace is normalized, and `Options(dehyphenate=True)` joins
+words split across line breaks. Pages are kept separate so the embedding layer
+can attach a page number to every chunk.
+
+There is also a test-only inspection CLI that is not part of the application
+surface:
+
+```bash
+uv run mling-bookparse-test books/the-great-gatsby.pdf
+# or, with the file passed through make:
+make parse book=books/the-great-gatsby.pdf
+```
+
+It prints a summary and then prompts for page numbers until you quit with `q`.
+
 ## Configuration
 
 All settings come from the environment, with defaults in `src/mling/config.py`.

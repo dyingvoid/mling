@@ -3,10 +3,13 @@ export
 
 export PROJECT_ROOT=$(shell pwd)
 
-.PHONY: up down cleanup migrate-up migrate-down migrate-action migrate-create run
+.PHONY: up down cleanup migrate-up migrate-down migrate-action migrate-create run parse
 
 run:
 	@uv run python ${PROJECT_ROOT}/src/mling/__init__.py
+
+parse:
+	@uv run mling-bookparse-test $(book)
 
 up:
 	@docker compose up -d

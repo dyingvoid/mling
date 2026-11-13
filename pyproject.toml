@@ -12,11 +12,13 @@ dependencies = [
     "langchain-openai>=1.7.4",
     "langchain-postgres>=0.0.19",
     "langchain-text-splitters>=1.1.0",
+    "pypdf>=5.0.0",
     "psycopg[binary]>=3.3.9",
 ]
 
 [project.scripts]
 mling = "mling:main"
+mling-bookparse-test = "mling.bookparse.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.13.8,<0.14.0"]
