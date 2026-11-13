@@ -13,6 +13,8 @@ from langchain_postgres.v2.indexes import DistanceStrategy
 from mling.config import Settings
 from mling.embeddings import build_embeddings
 
+DEFAULT_METADATA_COLUMNS = ("book_name", "page")
+
 
 class EmbeddingStore:
     def __init__(
@@ -20,15 +22,18 @@ class EmbeddingStore:
         embeddings: Embeddings,
         engine: PGEngine,
         table_name: str,
+        metadata_columns: Sequence[str] = DEFAULT_METADATA_COLUMNS,
         distance_strategy: DistanceStrategy = DistanceStrategy.COSINE_DISTANCE,
     ) -> None:
         self._embeddings = embeddings
         self._engine = engine
         self._table_name = table_name
+        self._metadata_columns = tuple(metadata_columns)
         self._store = PGVectorStore.create_sync(
             engine=engine,
             embedding_service=embeddings,
             table_name=table_name,
+            metadata_columns=list(self._metadata_columns),
             distance_strategy=distance_strategy,
         )
 
@@ -55,6 +60,10 @@ class EmbeddingStore:
     @property
     def table_name(self) -> str:
         return self._table_name
+
+    @property
+    def metadata_columns(self) -> tuple[str, ...]:
+        return self._metadata_columns
 
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
         return self._embeddings.embed_documents(list(texts))

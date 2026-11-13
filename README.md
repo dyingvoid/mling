@@ -26,12 +26,17 @@ CREATE TABLE mling_documents (
     langchain_id TEXT PRIMARY KEY,
     content TEXT NOT NULL,
     embedding vector(384) NOT NULL,
-    langchain_metadata JSONB
+    langchain_metadata JSONB,
+    book_name TEXT,
+    page INTEGER
 );
 
 CREATE INDEX ix_mling_documents_embedding_cosine
     ON mling_documents
     USING hnsw (embedding vector_cosine_ops);
+
+CREATE INDEX ix_mling_documents_book_name_page
+    ON mling_documents (book_name, page);
 ```
 
 The column names are the defaults expected by `PGVectorStore`. The table itself
@@ -39,8 +44,29 @@ is owned by the migrations; the library only reads and writes rows. If the
 embedding model changes, update `EMBEDDING_DIMENSION` **and** the `vector(...)`
 dimension in `migrations/000002_create_documents_table.up.sql`.
 
-Document metadata is stored in the `langchain_metadata` JSONB column, so
-arbitrary metadata keys remain queryable through `filter`.
+`book_name` and `page` are promoted to real columns through `metadata_columns`
+and stored as nullable values (`page` is optional). Remaining document metadata
+stays in the `langchain_metadata` JSONB column, so arbitrary keys remain
+queryable through `filter`.
+
+The `(book_name, page)` index serves both book-only queries and book plus page
+range queries:
+
+```python
+store.search("What did Gatsby believe?", k=3, filter={"book_name": "The Great Gatsby"})
+
+store.search(
+    "What did Gatsby believe?",
+    k=3,
+    filter={
+        "$and": [
+            {"book_name": "The Great Gatsby"},
+            {"page": {"$gte": 200}},
+            {"page": {"$lte": 400}},
+        ]
+    },
+)
+```
 
 ## Usage
 
