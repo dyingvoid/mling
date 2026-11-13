@@ -44,6 +44,42 @@ is owned by the migrations; the library only reads and writes rows. If the
 embedding model changes, update `EMBEDDING_DIMENSION` **and** the `vector(...)`
 dimension in `migrations/000002_create_documents_table.up.sql`.
 
+Ingestion adds two tables and a `book_checksum` column:
+
+```sql
+CREATE TABLE mling_books (
+    checksum TEXT PRIMARY KEY,          -- sha256 of the source file
+    name TEXT NOT NULL,
+    source TEXT NOT NULL,
+    size_bytes BIGINT NOT NULL,
+    page_count INTEGER NOT NULL,
+    chunk_count INTEGER NOT NULL,
+    embedding_model TEXT NOT NULL,
+    chunk_size INTEGER NOT NULL,
+    chunk_overlap INTEGER NOT NULL,
+    metadata JSONB NOT NULL,
+    ingested_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE mling_book_leases (
+    checksum TEXT PRIMARY KEY,
+    token UUID NOT NULL,
+    owner TEXT NOT NULL,
+    source TEXT NOT NULL,
+    started_at TIMESTAMPTZ NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL
+);
+
+ALTER TABLE mling_documents
+    ADD COLUMN book_checksum TEXT
+        REFERENCES mling_books (checksum) ON DELETE CASCADE;
+```
+
+`mling_books` only contains fully committed books. `mling_book_leases` holds
+in-flight work; a lease expires after `INGEST_LEASE_TIMEOUT_SECONDS` and can be
+taken over by a retry. Chunk IDs are `sha256(checksum:page:chunk)`, so ingesting
+the same bytes twice is a no-op unless `force` is set.
+
 `book_name` and `page` are promoted to real columns through `metadata_columns`
 and stored as nullable values (`page` is optional). Remaining document metadata
 stays in the `langchain_metadata` JSONB column, so arbitrary keys remain
@@ -142,9 +178,76 @@ make parse book=books/the-great-gatsby.pdf
 
 It prints a summary and then prompts for page numbers until you quit with `q`.
 
+## Book ingestion
+
+`mling.ingest` connects the parser, chunker, embeddings, and vector store. Files
+are identified by `sha256` of their bytes, so the same PDF under a different
+name is treated as the same book.
+
+```python
+from mling.ingest import IngestOptions, ingest_book
+
+summary = ingest_book(
+    "books/the-great-gatsby.pdf",
+    options=IngestOptions(chunk_size=1000, chunk_overlap=200),
+)
+print(summary.name, summary.page_count, summary.chunk_count, summary.skipped)
+```
+
+Each page is chunked independently, so `page` metadata is exact. Blank pages are
+skipped. Ingestion is atomic per book: chunks are embedded first, then the book
+row, chunk rows, and lease cleanup are committed in a single transaction. A
+failed run leaves no partial book, and a re-run replaces the old chunks for that
+checksum.
+
+`BookPipeline` is reusable and takes steps plus lifecycle hooks:
+
+```python
+from mling.ingest import (
+    BookPipeline,
+    PipelineHooks,
+    commit_step,
+    documents_step,
+    embed_step,
+    parse_step,
+)
+
+pipeline = BookPipeline(
+    leases,
+    hooks=PipelineHooks(
+        on_start=lambda ctx: print("starting", ctx.source.path),
+        after_step=lambda ctx, step: print("done", step.name),
+        on_error=lambda ctx, error: print("failed", error),
+    ),
+)
+context = pipeline.run(
+    source,
+    options,
+    [
+        parse_step(),
+        documents_step(),
+        embed_step(embed),
+        commit_step(writer, embedding_model="BAAI/bge-small-en-v1.5"),
+    ],
+    name="Optional override",
+)
+```
+
+The pipeline acquires the checksum lease, renews it before every step, and
+releases it on success or failure. Long steps can call `context.renew()`
+themselves; the embedding step does this between batches. Leases are fenced by
+a token, so a worker that loses its lease cannot commit stale chunks.
+
+Use `IngestOptions(force=True)` to re-ingest an already registered checksum, for
+example after changing the embedding model or chunk size.
+
 ## Configuration
 
 All settings come from the environment, with defaults in `src/mling/config.py`.
 See `.env.example`. `PGVECTOR_TABLE` selects the table, and
 `EMBEDDING_DIMENSION` must match both the model (384 for `bge-small-en-v1.5`)
 and the `vector(...)` type in the migration.
+
+Ingestion uses `INGEST_LEASE_TIMEOUT_SECONDS` (default 300) as the lease
+silence budget and `INGEST_EMBED_BATCH_SIZE` (default 64) as the number of
+chunks embedded between lease renewals.

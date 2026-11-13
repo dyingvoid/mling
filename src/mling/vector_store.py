@@ -12,8 +12,9 @@ from langchain_postgres.v2.indexes import DistanceStrategy
 
 from mling.config import Settings
 from mling.embeddings import build_embeddings
+from mling.schema import DOCUMENT_METADATA_COLUMNS
 
-DEFAULT_METADATA_COLUMNS = ("book_name", "page")
+DEFAULT_METADATA_COLUMNS = DOCUMENT_METADATA_COLUMNS
 
 
 class EmbeddingStore:

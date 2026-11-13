@@ -18,6 +18,8 @@ class Settings:
     embedding_batch_size: int
     embedding_timeout: float
     embedding_query_instruction: str
+    ingest_lease_timeout_seconds: int
+    ingest_embed_batch_size: int
     table_name: str
     postgres_dsn: str
 
@@ -38,6 +40,10 @@ class Settings:
                 "EMBEDDING_QUERY_INSTRUCTION",
                 "Represent this sentence for searching relevant passages: ",
             ),
+            ingest_lease_timeout_seconds=int(
+                _env("INGEST_LEASE_TIMEOUT_SECONDS", "300")
+            ),
+            ingest_embed_batch_size=int(_env("INGEST_EMBED_BATCH_SIZE", "64")),
             table_name=_env("PGVECTOR_TABLE", "mling_documents"),
             postgres_dsn=_env("DATABASE_URL", _postgres_dsn()),
         )

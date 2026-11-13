@@ -640,6 +640,7 @@ dependencies = [
     { name = "langchain-text-splitters" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pypdf" },
+    { name = "sqlalchemy" },
 ]
 
 [package.metadata]
@@ -650,6 +651,7 @@ requires-dist = [
     { name = "langchain-text-splitters", specifier = ">=1.1.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.9" },
     { name = "pypdf", specifier = ">=5.0.0" },
+    { name = "sqlalchemy", specifier = ">=2.0" },
 ]
 
 [[package]]
