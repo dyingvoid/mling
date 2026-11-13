@@ -21,6 +21,7 @@ dependencies = [
 mling = "mling:main"
 mling-bookparse-test = "mling.bookparse.cli:main"
 mling-ingest = "mling.ingest.cli:main"
+mling-retrieve = "mling.retrieval.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.13.8,<0.14.0"]

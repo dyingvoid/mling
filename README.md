@@ -15,6 +15,7 @@ replacement for the deprecated `PGVector` class.
 - `indexing/` — chunking, the embedding client, storage schema constants, and
   the pgvector store.
 - `ingest/` — the parse → chunk → embed → commit pipeline and its CLI.
+- `retrieval/` — filtered similarity search over stored chunks and its CLI.
 - `config.py` — environment-backed settings shared by the layers.
 
 ## Setup
@@ -206,10 +207,47 @@ make ingest book=books/the-great-gatsby.pdf
 make ingest book=books/the-great-gatsby.pdf args=--dry-run
 ```
 
-Directories are walked recursively for supported files. `--dry-run` parses and
-chunks without embedding or writing to the database, which is useful for
-checking extraction. `--quiet` suppresses per-step progress. Extra flags are
-forwarded through `make` with `args=...`.
+Directories are walked recursively for supported files, and the process exits
+non-zero if any input fails. Successful runs print `ingested ...`, `skipped ...`,
+or `parsed ...` (for dry runs); per-step progress goes to stderr.
+
+### Command-line flags
+
+`uv run mling-ingest --help` lists everything. The main knobs:
+
+| Flag | What it does |
+| --- | --- |
+| `path ...` | One or more files or directories to ingest. |
+| `--dry-run` | Parse and chunk only: no embeddings, no database writes, no lease. Use it to check extraction and chunk counts. |
+| `--force` | Re-ingest a checksum that is already registered. Without it, a known book is reported as `skipped`. |
+| `--chunk-size N` | Characters per chunk. Default `1000`. |
+| `--chunk-overlap N` | Characters shared between adjacent chunks. Default `200`; must be smaller than `--chunk-size`. |
+| `--embed-batch-size N` | Number of chunks embedded between lease renewals. Defaults to `INGEST_EMBED_BATCH_SIZE` (`64`). |
+| `--dehyphenate` | Join words broken across line breaks, turning `inter-` / `national` into `international`. Off by default. |
+| `--drop-blank-pages` | Drop pages with no extracted text before they reach the domain model. Ingestion already skips blank pages while chunking, so this mainly affects the stored `page_count`. |
+| `--name TEXT` | Override the book name instead of using the PDF title or filename. Only valid with a single file. |
+| `--quiet` | Hide the per-step `parse` / `documents` / `embed` / `commit` progress; still print the final summary. |
+
+Common combinations:
+
+```bash
+# Check parsing and chunking without Postgres or the TEI model running
+uv run mling-ingest books/the-great-gatsby.pdf --dry-run
+
+# Smaller chunks and a re-ingest of a book that is already stored
+uv run mling-ingest books/the-great-gatsby.pdf \
+  --chunk-size 500 --chunk-overlap 100 --force
+
+# Batch a directory and only show the final summaries
+uv run mling-ingest books/ --quiet
+
+# Through make: book= is the first path, args= is everything else
+make ingest book=books/the-great-gatsby.pdf args=--dry-run
+make ingest book=books/ args="--force --quiet"
+```
+
+When passing more than one flag through `make`, quote `args` so the shell sees
+them as a single value.
 
 ```python
 from mling.ingest import IngestOptions, ingest_book
@@ -267,6 +305,84 @@ a token, so a worker that loses its lease cannot commit stale chunks.
 
 Use `IngestOptions(force=True)` to re-ingest an already registered checksum, for
 example after changing the embedding model or chunk size.
+
+## Retrieval
+
+`mling.retrieval` embeds a query and returns the closest chunks for one book.
+Results can optionally be restricted to an inclusive page range. The query is
+prefixed with `EMBEDDING_QUERY_INSTRUCTION`, exactly like `embed_query`; stored
+chunks are not prefixed.
+
+```bash
+uv run mling-retrieve \
+  --book "The Great Gatsby" \
+  --query "What did Gatsby believe?" \
+  --limit 5 \
+  --from-page 100 \
+  --to-page 150
+```
+
+| Flag | What it does |
+| --- | --- |
+| `--book TEXT` | Required. Exact `book_name` stored during ingestion. |
+| `--query TEXT` | Required. Text to embed and search for. |
+| `--limit N`, `-k N` | Number of rows to return. Default `5`. |
+| `--from-page N` | Optional inclusive lower page bound. |
+| `--to-page N` | Optional inclusive upper page bound. |
+| `--json` | Print rows as JSON instead of formatted blocks. |
+
+Both page bounds are optional; omit either or both to search the whole book. The
+default output is a block per result:
+
+```text
+[1] The Great Gatsby - page 42 - distance 0.1823
+    He stretched out his arms toward the dark water...
+```
+
+`distance` is the cosine distance used by the vector index, so a smaller value
+means a closer match. `--json` emits the same rows as objects with `rank`,
+`book_name`, `page`, `distance`, and `content`.
+
+Through `make`, use `book`, `query`, and optionally `n`, `from_page`, and
+`to_page`. Extra CLI flags go through `args`:
+
+```bash
+make retrieve book="The Great Gatsby" query="What did Gatsby believe?"
+
+make retrieve \
+  book="The Great Gatsby" \
+  from_page=100 \
+  to_page=150 \
+  n=10 \
+  query="What did Gatsby believe?"
+
+make retrieve book="The Great Gatsby" query="Gatsby's dream" args=--json
+```
+
+Quote values that contain spaces. The `book` value must match the name stored in
+`book_name`; ingestion uses the PDF title unless it was run with `--name`.
+
+The same behavior is available as a library:
+
+```python
+from mling.retrieval import RetrievalOptions, retrieve
+
+hits = retrieve(
+    RetrievalOptions(
+        book_name="The Great Gatsby",
+        query="What did Gatsby believe?",
+        limit=5,
+        from_page=100,
+        to_page=150,
+    )
+)
+for hit in hits:
+    print(hit.rank, hit.page, hit.distance, hit.content)
+```
+
+`build_filter(options)` is exported if you need the LangChain metadata filter
+without running a search. No schema change is required: retrieval uses the
+existing `(book_name, page)` index.
 
 ## Configuration
 

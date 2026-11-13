@@ -3,7 +3,7 @@ export
 
 export PROJECT_ROOT=$(shell pwd)
 
-.PHONY: up down cleanup migrate-up migrate-down migrate-action migrate-create run parse ingest
+.PHONY: up down cleanup migrate-up migrate-down migrate-action migrate-create run parse ingest retrieve
 
 run:
 	@uv run python ${PROJECT_ROOT}/src/mling/__init__.py
@@ -17,6 +17,23 @@ ingest:
 		exit 1; \
 	fi
 	@uv run mling-ingest $(book) $(args)
+
+retrieve:
+	@if [ -z "$(book)" ]; then \
+		echo "book is not specified. Example: make retrieve book=\"The Great Gatsby\" query=\"What did Gatsby believe?\""; \
+		exit 1; \
+	fi
+	@if [ -z "$(query)" ]; then \
+		echo "query is not specified. Example: make retrieve book=\"The Great Gatsby\" query=\"What did Gatsby believe?\""; \
+		exit 1; \
+	fi
+	@uv run mling-retrieve \
+		--book "$(book)" \
+		--query "$(query)" \
+		--limit "$(or $(n),5)" \
+		$(if $(from_page),--from-page "$(from_page)",) \
+		$(if $(to_page),--to-page "$(to_page)",) \
+		$(args)
 
 up:
 	@docker compose up -d
