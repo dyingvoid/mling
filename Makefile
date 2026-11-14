@@ -2,21 +2,22 @@
 export
 
 export PROJECT_ROOT=$(shell pwd)
+export PROCESSING_DIR=$(PROJECT_ROOT)/processing
 
 .PHONY: up down cleanup migrate-up migrate-down migrate-action migrate-create run parse ingest retrieve
 
 run:
-	@uv run python ${PROJECT_ROOT}/src/mling/__init__.py
+	@uv run --project $(PROCESSING_DIR) python $(PROCESSING_DIR)/src/mling/__init__.py
 
 parse:
-	@uv run mling-bookparse-test $(book)
+	@uv run --project $(PROCESSING_DIR) mling-bookparse-test $(book)
 
 ingest:
 	@if [ -z "$(book)" ]; then \
 		echo "book is not specified. Example: make ingest book=books/the-great-gatsby.pdf"; \
 		exit 1; \
 	fi
-	@uv run mling-ingest $(book) $(args)
+	@uv run --project $(PROCESSING_DIR) mling-ingest $(book) $(args)
 
 retrieve:
 	@if [ -z "$(book)" ]; then \
@@ -27,7 +28,7 @@ retrieve:
 		echo "query is not specified. Example: make retrieve book=\"The Great Gatsby\" query=\"What did Gatsby believe?\""; \
 		exit 1; \
 	fi
-	@uv run mling-retrieve \
+	@uv run --project $(PROCESSING_DIR) mling-retrieve \
 		--book "$(book)" \
 		--query "$(query)" \
 		--limit "$(or $(n),5)" \

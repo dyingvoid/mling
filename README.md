@@ -8,7 +8,19 @@ replacement for the deprecated `PGVector` class.
 
 ## Layout
 
-`src/mling` is grouped by responsibility:
+This repository is a monorepo. The Python workspace lives in `processing/`; the
+root holds the shared local infrastructure:
+
+- `processing/pyproject.toml`, `processing/uv.lock`, `processing/.python-version`
+  — the Python project and its dependencies.
+- `processing/src/mling` — the Python package, grouped by responsibility.
+- `processing/migrations` — database migrations owned by the processing service.
+- `docker-compose.yml` — Postgres (pgvector) and the local TEI embedding model.
+- `Makefile` — convenience targets that run the Python project and migrations.
+- `.env` / `.env.example` — shared environment configuration.
+- `books/` — local sample data (ignored by Git).
+
+`processing/src/mling` is grouped by responsibility:
 
 - `domain/` — the `Book` and `Page` models.
 - `bookparse/` — PDF extraction into the domain models.
@@ -20,10 +32,13 @@ replacement for the deprecated `PGVector` class.
 
 ## Setup
 
+Run commands from the repository root. `uv` is pointed at the `processing/`
+workspace, and `make` targets do this for you.
+
 ```bash
 make up
 make migrate-up
-uv sync
+uv sync --project processing
 ```
 
 TEI exposes an OpenAI-compatible `/v1/embeddings` endpoint, so the component uses
@@ -54,7 +69,7 @@ CREATE INDEX ix_mling_documents_book_name_page
 The column names are the defaults expected by `PGVectorStore`. The table itself
 is owned by the migrations; the library only reads and writes rows. If the
 embedding model changes, update `EMBEDDING_DIMENSION` **and** the `vector(...)`
-dimension in `migrations/000002_create_documents_table.up.sql`.
+dimension in `processing/migrations/000002_create_documents_table.up.sql`.
 
 Ingestion adds two tables and a `book_checksum` column:
 
@@ -159,8 +174,8 @@ Queries are prefixed with `EMBEDDING_QUERY_INSTRUCTION`; documents are not.
 
 ## Book parsing
 
-PDFs are parsed into the domain model in `src/mling/domain` (`Book`, `Page`).
-The parser lives in `src/mling/bookparse` and depends on the domain layer, not
+PDFs are parsed into the domain model in `processing/src/mling/domain` (`Book`, `Page`).
+The parser lives in `processing/src/mling/bookparse` and depends on the domain layer, not
 the other way around.
 
 ```python
@@ -183,7 +198,7 @@ There is also a test-only inspection CLI that is not part of the application
 surface:
 
 ```bash
-uv run mling-bookparse-test books/the-great-gatsby.pdf
+uv run --project processing mling-bookparse-test books/the-great-gatsby.pdf
 # or, with the file passed through make:
 make parse book=books/the-great-gatsby.pdf
 ```
@@ -199,9 +214,9 @@ name is treated as the same book.
 Ingest from the command line:
 
 ```bash
-uv run mling-ingest books/the-great-gatsby.pdf
-uv run mling-ingest books/ --force
-uv run mling-ingest books/the-great-gatsby.pdf --dry-run
+uv run --project processing mling-ingest books/the-great-gatsby.pdf
+uv run --project processing mling-ingest books/ --force
+uv run --project processing mling-ingest books/the-great-gatsby.pdf --dry-run
 
 make ingest book=books/the-great-gatsby.pdf
 make ingest book=books/the-great-gatsby.pdf args=--dry-run
@@ -213,7 +228,7 @@ or `parsed ...` (for dry runs); per-step progress goes to stderr.
 
 ### Command-line flags
 
-`uv run mling-ingest --help` lists everything. The main knobs:
+`uv run --project processing mling-ingest --help` lists everything. The main knobs:
 
 | Flag | What it does |
 | --- | --- |
@@ -232,14 +247,14 @@ Common combinations:
 
 ```bash
 # Check parsing and chunking without Postgres or the TEI model running
-uv run mling-ingest books/the-great-gatsby.pdf --dry-run
+uv run --project processing mling-ingest books/the-great-gatsby.pdf --dry-run
 
 # Smaller chunks and a re-ingest of a book that is already stored
-uv run mling-ingest books/the-great-gatsby.pdf \
+uv run --project processing mling-ingest books/the-great-gatsby.pdf \
   --chunk-size 500 --chunk-overlap 100 --force
 
 # Batch a directory and only show the final summaries
-uv run mling-ingest books/ --quiet
+uv run --project processing mling-ingest books/ --quiet
 
 # Through make: book= is the first path, args= is everything else
 make ingest book=books/the-great-gatsby.pdf args=--dry-run
@@ -314,7 +329,7 @@ prefixed with `EMBEDDING_QUERY_INSTRUCTION`, exactly like `embed_query`; stored
 chunks are not prefixed.
 
 ```bash
-uv run mling-retrieve \
+uv run --project processing mling-retrieve \
   --book "The Great Gatsby" \
   --query "What did Gatsby believe?" \
   --limit 5 \
@@ -386,7 +401,7 @@ existing `(book_name, page)` index.
 
 ## Configuration
 
-All settings come from the environment, with defaults in `src/mling/config.py`.
+All settings come from the environment, with defaults in `processing/src/mling/config.py`.
 See `.env.example`. `PGVECTOR_TABLE` selects the table, and
 `EMBEDDING_DIMENSION` must match both the model (384 for `bge-small-en-v1.5`)
 and the `vector(...)` type in the migration.

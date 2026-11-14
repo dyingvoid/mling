@@ -34,7 +34,7 @@ services:
     environment:
       PGOPTIONS: "-c lock_timeout=${MIGRATE_LOCK_TIMEOUT:-5}s"
     volumes:
-      - ${PROJECT_ROOT:-.}/migrations:/migrations
+      - ${PROJECT_ROOT:-.}/processing/migrations:/migrations
     depends_on:
       db:
         condition: service_healthy
